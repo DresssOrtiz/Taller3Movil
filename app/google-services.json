@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "376722093571",
+    "project_id": "taller3movil-ed50d",
+    "storage_bucket": "taller3movil-ed50d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:376722093571:android:0ceaea56ff2a8e56a34036",
+        "android_client_info": {
+          "package_name": "com.example.taller3movil"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnylSco5tH1z4wnCkLw7enMg4IvYiDBl8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
