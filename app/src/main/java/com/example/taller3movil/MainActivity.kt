@@ -3,26 +3,53 @@ package com.example.taller3movil
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.taller3movil.screens.LoginScreen
+import com.example.taller3movil.screens.MenuScreen
+import com.example.taller3movil.screens.ProfileScreen
+import com.example.taller3movil.screens.RegisterScreen
 import com.example.taller3movil.ui.theme.Taller3MovilTheme
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
             Taller3MovilTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+                val auth = FirebaseAuth.getInstance()
+                var currentScreen by remember {
+                    mutableStateOf(
+                        if (auth.currentUser != null) AppScreen.Menu else AppScreen.Login
+                    )
+                }
+
+                when (currentScreen) {
+                    AppScreen.Login -> LoginScreen(
+                        onLoginSuccess = { currentScreen = AppScreen.Menu },
+                        onGoToRegister = { currentScreen = AppScreen.Register },
+                        auth = auth
+                    )
+
+                    AppScreen.Register -> RegisterScreen(
+                        onRegisterSuccess = { currentScreen = AppScreen.Menu },
+                        onBackToLogin = { currentScreen = AppScreen.Login },
+                        auth = auth
+                    )
+
+                    AppScreen.Menu -> MenuScreen(
+                        onProfileClick = { currentScreen = AppScreen.Profile },
+                        onLogout = {
+                            auth.signOut()
+                            currentScreen = AppScreen.Login
+                        }
+                    )
+
+                    AppScreen.Profile -> ProfileScreen(
+                        onBack = { currentScreen = AppScreen.Menu },
+                        auth = auth
                     )
                 }
             }
@@ -30,18 +57,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Taller3MovilTheme {
-        Greeting("Android")
-    }
+private enum class AppScreen {
+    Login,
+    Register,
+    Menu,
+    Profile
 }
