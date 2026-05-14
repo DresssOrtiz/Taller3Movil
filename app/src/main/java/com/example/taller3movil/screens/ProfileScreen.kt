@@ -1,5 +1,15 @@
 package com.example.taller3movil.screens
 
+import android.content.Context
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,11 +33,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.example.taller3movil.data.UserRepository
 import com.example.taller3movil.data.model.User
 import com.google.firebase.auth.FirebaseAuth
+import java.io.File
 
 @Composable
 fun ProfileScreen(
@@ -36,6 +52,7 @@ fun ProfileScreen(
     auth: FirebaseAuth = FirebaseAuth.getInstance(),
     userRepository: UserRepository = UserRepository()
 ) {
+    val context = LocalContext.current
     var user by remember { mutableStateOf<User?>(null) }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -44,6 +61,29 @@ fun ProfileScreen(
     var isLoading by remember { mutableStateOf(true) }
     var isSavingProfile by remember { mutableStateOf(false) }
     var isChangingPassword by remember { mutableStateOf(false) }
+    var profileImageUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+    var profileImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            profileImageUri = uri
+            message = "Foto seleccionada localmente. Storage pendiente por configuracion."
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            profileImageUri = cameraImageUri
+            message = "Foto seleccionada localmente. Storage pendiente por configuracion."
+        } else {
+            message = "No se tomo la foto"
+        }
+    }
 
     LaunchedEffect(Unit) {
         val uid = auth.currentUser?.uid.orEmpty()
@@ -63,13 +103,19 @@ fun ProfileScreen(
                 isLoading = false
 
                 if (loadedUser == null) {
-                    message = "No se encontró información del usuario"
+                    message = "No se encontro informacion del usuario"
                 }
             }
             .addOnFailureListener { error ->
                 isLoading = false
                 message = error.message ?: "No se pudo cargar el perfil"
             }
+    }
+
+    LaunchedEffect(profileImageUri) {
+        profileImageBitmap = profileImageUri?.let { uri ->
+            loadImageBitmap(context, uri)
+        }
     }
 
     Surface(
@@ -106,6 +152,57 @@ fun ProfileScreen(
                     val currentUser = user ?: User()
                     val uid = auth.currentUser?.uid.orEmpty()
 
+                    Text(
+                        text = "Foto de perfil",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    ProfileImagePreview(imageBitmap = profileImageBitmap)
+
+                    if (profileImageUri != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Foto seleccionada localmente. Storage pendiente por configuracion.",
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Seleccionar de galeria")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            val imageFile = createProfileImageFile(context)
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                imageFile
+                            )
+                            cameraImageUri = uri
+                            cameraLauncher.launch(uri)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Tomar foto")
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
@@ -121,7 +218,7 @@ fun ProfileScreen(
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it },
-                        label = { Text("Teléfono") },
+                        label = { Text("Telefono") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -134,7 +231,7 @@ fun ProfileScreen(
                             val cleanPhone = phone.trim()
 
                             if (cleanName.isEmpty() || cleanPhone.isEmpty()) {
-                                message = "Nombre y teléfono son obligatorios"
+                                message = "Nombre y telefono son obligatorios"
                                 return@Button
                             }
 
@@ -166,7 +263,7 @@ fun ProfileScreen(
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { newPassword = it },
-                        label = { Text("Nueva contraseña") },
+                        label = { Text("Nueva contrasena") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation()
@@ -177,7 +274,7 @@ fun ProfileScreen(
                     Button(
                         onClick = {
                             if (newPassword.isEmpty()) {
-                                message = "Ingresa una nueva contraseña"
+                                message = "Ingresa una nueva contrasena"
                                 return@Button
                             }
 
@@ -188,11 +285,11 @@ fun ProfileScreen(
                                 ?.addOnSuccessListener {
                                     newPassword = ""
                                     isChangingPassword = false
-                                    message = "Contraseña actualizada"
+                                    message = "Contrasena actualizada"
                                 }
                                 ?.addOnFailureListener { error ->
                                     isChangingPassword = false
-                                    message = error.message ?: "No se pudo cambiar la contraseña"
+                                    message = error.message ?: "No se pudo cambiar la contrasena"
                                 }
                                 ?: run {
                                     isChangingPassword = false
@@ -202,7 +299,7 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isChangingPassword
                     ) {
-                        Text("Cambiar contraseña")
+                        Text("Cambiar contrasena")
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -250,10 +347,64 @@ fun ProfileScreen(
 }
 
 @Composable
+private fun ProfileImagePreview(imageBitmap: ImageBitmap?) {
+    if (imageBitmap != null) {
+        Image(
+            bitmap = imageBitmap,
+            contentDescription = "Foto de perfil",
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Sin foto seleccionada",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProfileText(label: String, value: String) {
     Text(
         text = "$label: $value",
         color = MaterialTheme.colorScheme.onBackground
     )
     Spacer(modifier = Modifier.height(8.dp))
+}
+
+private fun createProfileImageFile(context: Context): File {
+    val imagesDirectory = File(context.cacheDir, "images")
+    imagesDirectory.mkdirs()
+    return File.createTempFile("profile_photo_", ".jpg", imagesDirectory)
+}
+
+private fun loadImageBitmap(context: Context, uri: Uri): ImageBitmap? {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source).asImageBitmap()
+        } else {
+            @Suppress("DEPRECATION")
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri).asImageBitmap()
+        }
+    } catch (_: Exception) {
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BitmapFactory.decodeStream(inputStream)?.asImageBitmap()
+        }
+    }
 }
